@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/tab_scores"
+        android:icon="@drawable/music_select"
+        android:title="曲谱" />
+    <item
+        android:id="@+id/tab_favorites"
+        android:icon="@drawable/favorite"
+        android:title="收藏" />
+</menu>
