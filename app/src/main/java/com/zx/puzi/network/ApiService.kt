@@ -1,12 +1,15 @@
 package com.zx.puzi.network
 
 import com.zx.puzi.model.Score
+import com.zx.puzi.model.UpdateInfo
 import com.zx.puzi.utils.HtmlParserUtil
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
@@ -41,6 +44,39 @@ class ApiService private constructor() {
 
             override fun onResponse(call: Call, response: Response) {
                 onSuccess(response.code != 404)
+            }
+        })
+    }
+
+    fun checkUpdate(callback: (UpdateInfo) -> Unit) {
+// 构建表单请求体
+        val formBody = FormBody.Builder()
+            .add("_api_key", "56eac30dc043da146b8b834b88ab1ff8")
+            .add("appKey", "951ecb48ae4ab9b21932f8451c1ed2f0")
+            .build();
+
+        val request = Request.Builder()
+            .url("https://api.pgyer.com/apiv2/app/check")
+            .post(formBody)
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (response.code == 200 && response.body != null) {
+                    val data = response.body?.string()?:""
+                    if(data.isNotEmpty()){
+                        val jsonObject = JSONObject(data)
+                        val finalData = jsonObject.getJSONObject("data")
+                        val buildVersionNo = finalData.optString("buildVersionNo", "")
+                        val buildVersion = finalData.optString("buildVersion", "")
+                        val appURl = finalData.optString("appURl", "")
+                        val buildUpdateDescription = finalData.optString("buildUpdateDescription", "")
+                        callback(UpdateInfo(buildVersionNo,buildVersion,appURl,buildUpdateDescription))
+                    }
+                }
             }
         })
     }

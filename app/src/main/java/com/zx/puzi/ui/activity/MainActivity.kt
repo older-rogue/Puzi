@@ -1,15 +1,30 @@
 package com.zx.puzi.ui.activity
 
+import android.annotation.SuppressLint
+import android.app.Dialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.widget.Button
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
+import androidx.lifecycle.lifecycleScope
 import com.zx.puzi.R
 import com.zx.puzi.databinding.ActivityMainBinding
+import com.zx.puzi.model.UpdateInfo
+import com.zx.puzi.network.ApiService
 import com.zx.puzi.ui.fragment.FavoritesFragment
 import com.zx.puzi.ui.fragment.ScoresFragment
 import com.zx.puzi.utils.StatusBarUtil
+import com.zx.puzi.utils.getAppCode
+import com.zx.puzi.utils.getAppVersion
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -43,8 +58,19 @@ class MainActivity : AppCompatActivity() {
                 else -> false
             }
         }
+        initData()
     }
-    
+
+    private fun initData() {
+        ApiService.instance.checkUpdate {
+            lifecycleScope.launch {
+                if (this@MainActivity.getAppCode() < it.buildVersionNo.toInt()) {
+                    showCustomDialog(it)
+                }
+            }
+        }
+    }
+
     private fun initFragments() {
         // 第一次显示ScoresFragment
         if (supportFragmentManager.findFragmentByTag("scores") == null) {
@@ -67,5 +93,32 @@ class MainActivity : AppCompatActivity() {
             }
         }
         activeFragment = fragment
+    }
+
+    @SuppressLint("MissingInflatedId", "SetTextI18n")
+    fun showCustomDialog(info: UpdateInfo) {
+        val dialog = Dialog(this)
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_update, null)
+        dialog.setContentView(view)
+
+        val tvInfo = view.findViewById<TextView>(R.id.tv_info)
+        tvInfo.text = "当前版本：${this.getAppVersion()}\n" +
+                "最新版本：${info.buildVersion}\n" +
+                "更新内容：\n${info.buildUpdateDescription}"
+        val cancel = view.findViewById<TextView>(R.id.tv_cancel)
+        val update = view.findViewById<TextView>(R.id.tv_update)
+        cancel.setOnClickListener {
+            dialog.dismiss()
+        }
+        update.setOnClickListener {
+            dialog.dismiss()
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.appURl))
+                startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, "未安装可用浏览器", Toast.LENGTH_SHORT).show()
+            }
+        }
+        dialog.show()
     }
 }

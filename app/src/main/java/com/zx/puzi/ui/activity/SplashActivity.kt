@@ -2,8 +2,6 @@ package com.zx.puzi.ui.activity
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.zx.puzi.databinding.ActivitySplashBinding
@@ -21,10 +19,7 @@ class SplashActivity : AppCompatActivity() {
         
         // 设置状态栏为白色
         StatusBarUtil.setWhiteStatusBar(this)
-        
-        // 2秒后跳转到主页
-        Handler(Looper.getMainLooper()).postDelayed({
-            // 使用ApiService获取热门曲谱
+
             ApiService.instance.checkLicense(
                 onSuccess = { canUsed ->
                     this.runOnUiThread {
@@ -50,7 +45,5 @@ class SplashActivity : AppCompatActivity() {
                     }
                 }
             )
-
-        }, 1000)
     }
 }

@@ -191,7 +191,7 @@ class ScoreDetailActivity : AppCompatActivity() {
                 val regex3 = """var\s+${key}\s*=\s*"([^"]+)"""".toRegex()
                 regex3.findAll(html).forEach { it2 ->
                     val image = DecodeUtils.showdown(it2.groupValues[1], value)
-                    imageUrls.add("https://www.qupu123.com${image}")
+                    imageUrls.add(1, "https://www.qupu123.com${image}")
                 }
             }
         } catch (e: Exception) {
