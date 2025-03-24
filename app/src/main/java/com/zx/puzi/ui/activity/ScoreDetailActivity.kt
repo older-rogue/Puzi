@@ -180,7 +180,7 @@ class ScoreDetailActivity : AppCompatActivity() {
 
         try {
             // 查找曲谱图片区域
-            val regex = """href=['"](/Public/Uploads/[^'"]+)['"]""".toRegex()
+            val regex = """href=['"]((/Public/Uploads/|/data2/uploads/)[^'"]+)['"]""".toRegex()
             regex.findAll(html).forEach {
                 imageUrls.add("https://www.qupu123.com${it.groupValues[1]}")
             }
