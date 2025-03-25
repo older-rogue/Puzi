@@ -137,11 +137,4 @@ class MainActivity : AppCompatActivity() {
         }
         dialog.show()
     }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event?.action == KeyEvent.KEYCODE_BACK) {
-
-        }
-        return super.onKeyDown(keyCode, event)
-    }
 }

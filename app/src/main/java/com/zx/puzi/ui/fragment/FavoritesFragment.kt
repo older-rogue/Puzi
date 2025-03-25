@@ -71,7 +71,7 @@ class FavoritesFragment : Fragment() {
     }
 
     private fun navigateToScoreDetail(score: Score) {
-        favoritesManager.addFavorite(score)
+//        favoritesManager.addFavorite(score)
         val intent = Intent(requireContext(), ScoreDetailActivity::class.java).apply {
             putExtra("url", score.url)
             putExtra("title", score.title)
@@ -89,8 +89,19 @@ class FavoritesFragment : Fragment() {
     @SuppressLint("NotifyDataSetChanged")
     private fun loadFavorites() {
         val favorites = favoritesManager.getFavorites()
-        list.clear()
-        list.addAll(favorites)
+        val deleteList = mutableListOf<Score>()
+        list.forEach { song ->
+            if (favorites.find { it.url == song.url } == null) {
+                deleteList.add(song)
+            }
+        }
+        list.removeAll(deleteList)
+        favorites.forEach { song ->
+            if (list.find { it.url == song.url } == null) {
+                list.add(song)
+            }
+        }
+        list.sortByDescending { it.time }
         adapter.notifyDataSetChanged()
 
         // 显示空视图或列表

@@ -52,8 +52,6 @@ class FavoritesManager private constructor(private val context: Context) {
         } catch (e: JSONException) {
             e.printStackTrace()
         }
-        favoritesList.sortBy { it.time }
-
         return favoritesList
     }
 
@@ -65,6 +63,7 @@ class FavoritesManager private constructor(private val context: Context) {
 
         // 检查是否已存在
         currentFavorites.removeAll(currentFavorites.filter { it.url == score.url })
+        score.time = System.currentTimeMillis()
         currentFavorites.add(score)
         return saveFavorites(currentFavorites)
     }
@@ -103,7 +102,7 @@ class FavoritesManager private constructor(private val context: Context) {
                 put("title", score.title)
                 put("url", score.url)
                 put("name", score.name)
-                put("time", System.currentTimeMillis())
+                put("time", score.time)
             }
             jsonArray.put(jsonObject)
         }
