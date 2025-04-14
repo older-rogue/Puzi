@@ -15,7 +15,6 @@
 
         <activity
             android:name=".ui.activity.ScoreDetailActivity"
-            android:configChanges="orientation|screenSize"
             android:exported="false" />
 
         <activity

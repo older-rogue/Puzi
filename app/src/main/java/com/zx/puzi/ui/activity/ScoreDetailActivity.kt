@@ -1,23 +1,28 @@
 package com.zx.puzi.ui.activity
 
-import android.content.res.Configuration
+import android.graphics.drawable.Drawable
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import com.zx.puzi.R
 import com.zx.puzi.databinding.ActivityScoreDetailBinding
 import com.zx.puzi.local.FavoritesManager
 import com.zx.puzi.model.Score
-import com.zx.puzi.ui.adapter.ImageAdapter
 import com.zx.puzi.utils.DecodeUtils
-import com.zx.puzi.utils.ScreenUtil
 import com.zx.puzi.utils.StatusBarUtil
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -43,15 +48,11 @@ class ScoreDetailActivity : AppCompatActivity() {
         .build()
 
     private lateinit var favoritesManager: FavoritesManager
-    private lateinit var adapter: ImageAdapter
     private var scoreUrl: String = ""
     private var scoreTitle: String = ""
     private var name: String = ""
     private var isFavorite = false
     private var mediaPlayer: MediaPlayer? = null
-    private var imageUrls: List<String> = listOf()
-    private var isLand = false
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,24 +61,11 @@ class ScoreDetailActivity : AppCompatActivity() {
 
         // 设置状态栏为白色
         StatusBarUtil.setWhiteStatusBar(this)
-        val orientation = resources.configuration.orientation
-        isLand = orientation == Configuration.ORIENTATION_LANDSCAPE
+
         // 获取传递的参数并初始化界面
         setupIntentData()
         setupUI()
         loadScoreDetail()
-        initRecycle()
-    }
-
-    private fun initRecycle() {
-        adapter = ImageAdapter(if (isLand) ScreenUtil.getAvailableScreenHeight(this) else -1) {
-            binding.progressBar.visibility = View.GONE
-            binding.favoriteButton.visibility = View.VISIBLE
-        }
-        val layoutManager = GridLayoutManager(this, if (isLand) 3 else 1)
-        binding.scoreImagesContainer.layoutManager = layoutManager
-        binding.scoreImagesContainer.adapter = adapter
-        adapter.submitList(imageUrls)
     }
 
     private fun setupIntentData() {
@@ -159,14 +147,14 @@ class ScoreDetailActivity : AppCompatActivity() {
 
             override fun onResponse(call: Call, response: Response) {
                 val html = response.body?.string() ?: ""
-                imageUrls = extractImageUrlsFromHtml(html)
+                val imageUrls = extractImageUrlsFromHtml(html)
                 val music = extractMusicUrlsFromHtml(html)
                 runOnUiThread {
                     if (music.isNotEmpty()) {
                         initMediaPlayer(music)
                         binding.llMusic.isVisible = true
                     }
-                    initRecycle()
+                    displayScoreImages(imageUrls)
                 }
             }
         })
@@ -226,6 +214,48 @@ class ScoreDetailActivity : AppCompatActivity() {
         return music
     }
 
+    private fun displayScoreImages(imageUrls: List<String>) {
+        binding.scoreImagesContainer.removeAllViews()
+
+        for (url in imageUrls) {
+            val imageView = ImageView(this).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                adjustViewBounds = true
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                Glide.with(this@ScoreDetailActivity).load(url)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onResourceReady(
+                            resource: Drawable,
+                            model: Any,
+                            target: Target<Drawable>?,
+                            dataSource: DataSource,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            binding.progressBar.visibility = View.GONE
+                            binding.favoriteButton.visibility = View.VISIBLE
+                            return false
+                        }
+
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<Drawable>,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            binding.progressBar.visibility = View.GONE
+                            binding.favoriteButton.visibility = View.VISIBLE
+                            return false
+                        }
+                    }).into(this)
+            }
+            binding.scoreImagesContainer.addView(imageView)
+        }
+    }
+
     private fun toggleFavorite() {
         if (isFavorite) {
             // 移除收藏
@@ -269,11 +299,5 @@ class ScoreDetailActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mediaPlayer?.release()
-    }
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        isLand = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
-        initRecycle()
     }
 } 
