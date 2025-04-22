@@ -59,7 +59,7 @@ class FavoritesFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = ScoreAdapter { score ->
+        adapter = ScoreAdapter(true) { score ->
             navigateToScoreDetail(score)
         }
 
@@ -102,6 +102,7 @@ class FavoritesFragment : Fragment() {
             }
         }
         list.sortByDescending { it.time }
+        list.sortBy { !it.isLove }
         adapter.notifyDataSetChanged()
 
         // 显示空视图或列表

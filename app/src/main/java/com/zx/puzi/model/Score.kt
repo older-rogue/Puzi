@@ -13,4 +13,5 @@ data class Score(
     val name: String = "",
     var time: Long = 0L,
     var isClick: Boolean = false,
+    var isLove: Boolean = false,
 )

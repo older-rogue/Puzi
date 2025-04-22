@@ -52,6 +52,7 @@ class ScoreDetailActivity : AppCompatActivity() {
     private var scoreTitle: String = ""
     private var name: String = ""
     private var isFavorite = false
+    private var isLove = false
     private var mediaPlayer: MediaPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,10 +94,18 @@ class ScoreDetailActivity : AppCompatActivity() {
         isFavorite = favoritesManager.isFavorite(scoreUrl)
         updateFavoriteButtonAppearance()
 
+        isLove = favoritesManager.isLove(scoreUrl)
+        updateLoveButtonAppearance()
+
         // 设置收藏按钮点击事件
         binding.favoriteButton.setOnClickListener {
             toggleFavorite()
         }
+
+        binding.loveButton.setOnClickListener {
+            toggleLove()
+        }
+
 
         binding.ivAction.setOnClickListener {
             if (mediaPlayer?.isPlaying == true) {
@@ -167,6 +176,7 @@ class ScoreDetailActivity : AppCompatActivity() {
             mediaPlayer?.prepareAsync()
             mediaPlayer?.setOnPreparedListener {
                 binding.sbProgress.max = mediaPlayer?.duration ?: Int.MAX_VALUE
+                binding.tvTotalTime.text = formatTime(mediaPlayer?.duration ?: 0)
                 updateSeekBar()
             }
         } catch (e: IOException) {
@@ -236,7 +246,7 @@ class ScoreDetailActivity : AppCompatActivity() {
                             isFirstResource: Boolean
                         ): Boolean {
                             binding.progressBar.visibility = View.GONE
-                            binding.favoriteButton.visibility = View.VISIBLE
+                            binding.llImg.visibility = View.VISIBLE
                             return false
                         }
 
@@ -247,7 +257,7 @@ class ScoreDetailActivity : AppCompatActivity() {
                             isFirstResource: Boolean
                         ): Boolean {
                             binding.progressBar.visibility = View.GONE
-                            binding.favoriteButton.visibility = View.VISIBLE
+                            binding.llImg.visibility = View.VISIBLE
                             return false
                         }
                     }).into(this)
@@ -261,6 +271,7 @@ class ScoreDetailActivity : AppCompatActivity() {
             // 移除收藏
             favoritesManager.removeFavorite(scoreUrl)
             isFavorite = false
+            isLove = false
             Toast.makeText(this, "已取消收藏", Toast.LENGTH_SHORT).show()
         } else {
             // 添加收藏
@@ -270,6 +281,7 @@ class ScoreDetailActivity : AppCompatActivity() {
             Toast.makeText(this, "已添加到收藏", Toast.LENGTH_SHORT).show()
         }
         updateFavoriteButtonAppearance()
+        updateLoveButtonAppearance()
     }
 
     private fun updateFavoriteButtonAppearance() {
@@ -278,6 +290,34 @@ class ScoreDetailActivity : AppCompatActivity() {
             else R.drawable.bg_grew
         )
     }
+
+    private fun toggleLove() {
+        if (isLove) {
+            val score = Score(scoreTitle, scoreUrl, name, isLove = false)
+            favoritesManager.addFavorite(score)
+            isLove = false
+            Toast.makeText(this, "已不喜欢", Toast.LENGTH_SHORT).show()
+        } else {
+            // 添加收藏
+            val score = Score(scoreTitle, scoreUrl, name, isLove = true)
+            favoritesManager.addFavorite(score)
+            isLove = true
+            isFavorite = true
+            Toast.makeText(this, "已设置为喜欢", Toast.LENGTH_SHORT).show()
+
+        }
+        updateLoveButtonAppearance()
+        updateFavoriteButtonAppearance()
+    }
+
+    private fun updateLoveButtonAppearance() {
+        binding.loveButton.setBackgroundResource(
+            if (isLove) R.drawable.bg_round
+            else R.drawable.bg_grew
+        )
+    }
+
+
 
     private fun updateSeekBar() {
         lifecycleScope.launch {

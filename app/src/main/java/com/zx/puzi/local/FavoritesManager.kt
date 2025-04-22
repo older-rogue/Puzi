@@ -47,7 +47,8 @@ class FavoritesManager private constructor(private val context: Context) {
                 val url = jsonObject.getString("url")
                 val name = jsonObject.optString("name", "")
                 val time = jsonObject.optLong("time", 0L)
-                favoritesList.add(Score(title, url, name, time))
+                val isLove = jsonObject.optBoolean("love",false)
+                favoritesList.add(Score(title, url, name, time, isLove = isLove))
             }
         } catch (e: JSONException) {
             e.printStackTrace()
@@ -92,6 +93,13 @@ class FavoritesManager private constructor(private val context: Context) {
     }
 
     /**
+     * 检查曲谱是否喜欢
+     */
+    fun isLove(url: String): Boolean {
+        return getFavorites().any { it.url == url && it.isLove }
+    }
+
+    /**
      * 保存收藏列表到本地
      */
     private fun saveFavorites(favorites: List<Score>): Boolean {
@@ -103,6 +111,7 @@ class FavoritesManager private constructor(private val context: Context) {
                 put("url", score.url)
                 put("name", score.name)
                 put("time", score.time)
+                put("love", score.isLove)
             }
             jsonArray.put(jsonObject)
         }
@@ -133,7 +142,8 @@ class FavoritesManager private constructor(private val context: Context) {
                 val url = jsonObject.getString("url")
                 val name = jsonObject.optString("name", "")
                 val time = jsonObject.optLong("time", 0L)
-                addFavorite(Score(title, url, name, time))
+                val isLove = jsonObject.optBoolean("love",false)
+                addFavorite(Score(title, url, name, time, isLove = isLove))
             }
             Toast.makeText(context, "同步成功", Toast.LENGTH_SHORT).show()
         } catch (e: Throwable) {
