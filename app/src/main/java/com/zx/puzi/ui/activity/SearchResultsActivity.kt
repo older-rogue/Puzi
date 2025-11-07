@@ -2,7 +2,9 @@ package com.zx.puzi.ui.activity
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
@@ -20,7 +22,6 @@ import com.zx.puzi.utils.StatusBarUtil
 class SearchResultsActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySearchResultsBinding
     private lateinit var adapter: ScoreAdapter
-    private var searchQuery: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,10 +29,14 @@ class SearchResultsActivity : AppCompatActivity() {
 
         StatusBarUtil.setWhiteStatusBar(this)
 
-        searchQuery = intent.getStringExtra("query") ?: ""
-
         setupViews()
-        performSearch()
+        
+        // 如果从其他页面传入了搜索关键词，则自动搜索
+        val initialQuery = intent.getStringExtra("query")
+        if (!initialQuery.isNullOrEmpty()) {
+            binding.searchEditText.setText(initialQuery)
+            performSearch()
+        }
     }
 
     private fun setupViews() {
@@ -47,6 +52,23 @@ class SearchResultsActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(context)
             adapter = this@SearchResultsActivity.adapter
         }
+
+        // 设置搜索按钮点击事件
+        binding.searchButton.setOnClickListener {
+            performSearch()
+        }
+
+        // 设置输入框回车搜索
+        binding.searchEditText.setOnEditorActionListener { _, actionId, event ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH ||
+                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
+            ) {
+                performSearch()
+                true
+            } else {
+                false
+            }
+        }
     }
 
     private fun navigateToScoreDetail(score: Score) {
@@ -59,15 +81,22 @@ class SearchResultsActivity : AppCompatActivity() {
     }
 
     private fun performSearch() {
-        if (searchQuery.isEmpty()) {
-            binding.emptyView.visibility = View.VISIBLE
+        val query = binding.searchEditText.text.toString().trim()
+        
+        if (query.isEmpty()) {
+            Toast.makeText(this, "请输入搜索内容", Toast.LENGTH_SHORT).show()
             return
         }
+
+        // 隐藏软键盘
+        binding.searchEditText.clearFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(binding.searchEditText.windowToken, 0)
 
         showLoading()
 
         ApiService.instance.searchScores(
-            query = searchQuery,
+            query = query,
             onSuccess = { scores ->
                 runOnUiThread {
                     hideLoading()

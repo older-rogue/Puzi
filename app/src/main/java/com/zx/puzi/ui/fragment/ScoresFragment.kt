@@ -2,11 +2,9 @@ package com.zx.puzi.ui.fragment
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -55,36 +53,23 @@ class ScoresFragment : Fragment() {
     }
 
     private fun setupSearchControls() {
+        // 点击搜索框或搜索按钮，跳转到搜索页面
+        binding.searchEditText.setOnClickListener {
+            navigateToSearch()
+        }
+        
         binding.searchButton.setOnClickListener {
-            performSearch()
+            navigateToSearch()
         }
 
         binding.ivRefresh.setOnClickListener {
             loadHotScores()
         }
-
-        binding.searchEditText.setOnEditorActionListener { _, actionId, event ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH ||
-                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
-            ) {
-                performSearch()
-                true
-            } else {
-                false
-            }
-        }
     }
 
-    private fun performSearch() {
-        val query = binding.searchEditText.text.toString().trim()
-        if (query.isNotEmpty()) {
-            val intent = Intent(requireContext(), SearchResultsActivity::class.java).apply {
-                putExtra("query", query)
-            }
-            startActivity(intent)
-        } else {
-            Toast.makeText(context, "请输入搜索内容", Toast.LENGTH_SHORT).show()
-        }
+    private fun navigateToSearch() {
+        val intent = Intent(requireContext(), SearchResultsActivity::class.java)
+        startActivity(intent)
     }
 
     private fun navigateToScoreDetail(score: Score) {
