@@ -39,15 +39,17 @@ import java.util.concurrent.TimeUnit
 
 /**
  * 曲谱详情页Activity
+ * 显示曲谱图片、音频播放和收藏功能
  */
 class ScoreDetailActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScoreDetailBinding
+    private lateinit var favoritesManager: FavoritesManager
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    private lateinit var favoritesManager: FavoritesManager
     private var scoreUrl: String = ""
     private var scoreTitle: String = ""
     private var name: String = ""
@@ -60,10 +62,8 @@ class ScoreDetailActivity : AppCompatActivity() {
         binding = DataBindingUtil.setContentView(this, R.layout.activity_score_detail)
         favoritesManager = FavoritesManager.getInstance(this)
 
-        // 设置状态栏为白色
         StatusBarUtil.setWhiteStatusBar(this)
 
-        // 获取传递的参数并初始化界面
         setupIntentData()
         setupUI()
         loadScoreDetail()
@@ -78,26 +78,29 @@ class ScoreDetailActivity : AppCompatActivity() {
     private fun setupUI() {
         binding.scoreTitle.text = scoreTitle
 
-        if (name.isNotEmpty()) {
-            binding.scoreAuthor.visibility = View.VISIBLE
-            binding.scoreAuthor.text = name
-        } else {
-            binding.scoreAuthor.visibility = View.GONE
+        binding.scoreAuthor.apply {
+            if (name.isNotEmpty()) {
+                visibility = View.VISIBLE
+                text = name
+            } else {
+                visibility = View.GONE
+            }
         }
 
-        // 设置返回按钮点击事件
         binding.toolbar.setNavigationOnClickListener {
             finish()
         }
 
-        // 检查是否已收藏
         isFavorite = favoritesManager.isFavorite(scoreUrl)
-        updateFavoriteButtonAppearance()
-
         isLove = favoritesManager.isLove(scoreUrl)
+        updateFavoriteButtonAppearance()
         updateLoveButtonAppearance()
 
-        // 设置收藏按钮点击事件
+        setupClickListeners()
+        setupMediaPlayerControls()
+    }
+
+    private fun setupClickListeners() {
         binding.favoriteButton.setOnClickListener {
             toggleFavorite()
         }
@@ -105,16 +108,19 @@ class ScoreDetailActivity : AppCompatActivity() {
         binding.loveButton.setOnClickListener {
             toggleLove()
         }
+    }
 
-
+    private fun setupMediaPlayerControls() {
         binding.ivAction.setOnClickListener {
-            if (mediaPlayer?.isPlaying == true) {
-                mediaPlayer?.pause()
-                binding.ivAction.setImageResource(R.drawable.start)
-            } else {
-                mediaPlayer?.start()
-                binding.ivAction.setImageResource(R.drawable.stop)
-                updateSeekBar()
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.pause()
+                    binding.ivAction.setImageResource(R.drawable.start)
+                } else {
+                    player.start()
+                    binding.ivAction.setImageResource(R.drawable.stop)
+                    updateSeekBar()
+                }
             }
         }
 
@@ -155,53 +161,63 @@ class ScoreDetailActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val html = response.body?.string() ?: ""
-                val imageUrls = extractImageUrlsFromHtml(html)
-                val music = extractMusicUrlsFromHtml(html)
-                runOnUiThread {
-                    if (music.isNotEmpty()) {
-                        initMediaPlayer(music)
-                        binding.llMusic.isVisible = true
+                response.use {
+                    val html = it.body?.string() ?: ""
+                    val imageUrls = extractImageUrlsFromHtml(html)
+                    val musicUrl = extractMusicUrlsFromHtml(html)
+
+                    runOnUiThread {
+                        if (musicUrl.isNotEmpty()) {
+                            initMediaPlayer(musicUrl)
+                            binding.llMusic.isVisible = true
+                        }
+                        displayScoreImages(imageUrls)
                     }
-                    displayScoreImages(imageUrls)
                 }
             }
         })
     }
 
-    private fun initMediaPlayer(music: String) {
-        mediaPlayer = MediaPlayer()
-        try {
-            mediaPlayer?.setDataSource(music) // 替换为真实的音频URL
-            mediaPlayer?.prepareAsync()
-            mediaPlayer?.setOnPreparedListener {
-                binding.sbProgress.max = mediaPlayer?.duration ?: Int.MAX_VALUE
-                binding.tvTotalTime.text = formatTime(mediaPlayer?.duration ?: 0)
-                updateSeekBar()
+    private fun initMediaPlayer(musicUrl: String) {
+        mediaPlayer = MediaPlayer().apply {
+            try {
+                setDataSource(musicUrl)
+                prepareAsync()
+                setOnPreparedListener {
+                    binding.sbProgress.max = duration
+                    binding.tvTotalTime.text = formatTime(duration)
+                }
+            } catch (e: IOException) {
+                e.printStackTrace()
+                runOnUiThread {
+                    Toast.makeText(this@ScoreDetailActivity, "音频加载失败", Toast.LENGTH_SHORT).show()
+                }
             }
-        } catch (e: IOException) {
-            e.printStackTrace()
         }
-
     }
 
+    /**
+     * 从HTML中提取图片URL
+     */
     private fun extractImageUrlsFromHtml(html: String): List<String> {
         val imageUrls = mutableListOf<String>()
 
         try {
-            // 查找曲谱图片区域
+            // 提取普通图片链接
             val regex = """href=['"]((/Public/Uploads/|/data2/uploads/)[^'"]+)['"]""".toRegex()
             regex.findAll(html).forEach {
                 imageUrls.add("https://www.qupu123.com${it.groupValues[1]}")
             }
-            val regex1 = """showopern\(([^,]+),\s*"([^"]+)"\)""".toRegex()
-            regex1.findAll(html).forEach {
+
+            // 提取加密图片链接
+            val showopernRegex = """showopern\(([^,]+),\s*"([^"]+)"\)""".toRegex()
+            showopernRegex.findAll(html).forEach {
                 val key = it.groupValues[1]
                 val value = it.groupValues[2]
-                val regex3 = """var\s+${key}\s*=\s*"([^"]+)"""".toRegex()
-                regex3.findAll(html).forEach { it2 ->
-                    val image = DecodeUtils.showdown(it2.groupValues[1], value)
-                    imageUrls.add(1, "https://www.qupu123.com${image}")
+                val varRegex = """var\s+$key\s*=\s*"([^"]+)"""".toRegex()
+                varRegex.findAll(html).forEach { match ->
+                    val image = DecodeUtils.showdown(match.groupValues[1], value)
+                    imageUrls.add(1, "https://www.qupu123.com$image")
                 }
             }
         } catch (e: Exception) {
@@ -210,24 +226,28 @@ class ScoreDetailActivity : AppCompatActivity() {
         return imageUrls
     }
 
+    /**
+     * 从HTML中提取音频URL
+     */
     private fun extractMusicUrlsFromHtml(html: String): String {
-        var music = ""
-        try {
-            // 查找曲谱图片区域  <source src="/Public/Uploads/mp3s/282550.mp3">
+        return try {
             val regex = """source\s+src=['"](/Public/Uploads/[^'"]+)['"]""".toRegex()
             regex.find(html)?.let {
-                music = "https://www.qupu123.com${it.groupValues[1]}"
-            }
+                "https://www.qupu123.com${it.groupValues[1]}"
+            } ?: ""
         } catch (e: Exception) {
             e.printStackTrace()
+            ""
         }
-        return music
     }
 
+    /**
+     * 显示曲谱图片
+     */
     private fun displayScoreImages(imageUrls: List<String>) {
         binding.scoreImagesContainer.removeAllViews()
 
-        for (url in imageUrls) {
+        imageUrls.forEach { url ->
             val imageView = ImageView(this).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -235,46 +255,51 @@ class ScoreDetailActivity : AppCompatActivity() {
                 )
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                Glide.with(this@ScoreDetailActivity).load(url)
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .listener(object : RequestListener<Drawable> {
-                        override fun onResourceReady(
-                            resource: Drawable,
-                            model: Any,
-                            target: Target<Drawable>?,
-                            dataSource: DataSource,
-                            isFirstResource: Boolean
-                        ): Boolean {
-                            binding.progressBar.visibility = View.GONE
-                            binding.llImg.visibility = View.VISIBLE
-                            return false
-                        }
-
-                        override fun onLoadFailed(
-                            e: GlideException?,
-                            model: Any?,
-                            target: Target<Drawable>,
-                            isFirstResource: Boolean
-                        ): Boolean {
-                            binding.progressBar.visibility = View.GONE
-                            binding.llImg.visibility = View.VISIBLE
-                            return false
-                        }
-                    }).into(this)
             }
+
+            Glide.with(this)
+                .load(url)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .listener(object : RequestListener<Drawable> {
+                    override fun onResourceReady(
+                        resource: Drawable,
+                        model: Any,
+                        target: Target<Drawable>?,
+                        dataSource: DataSource,
+                        isFirstResource: Boolean
+                    ): Boolean {
+                        binding.progressBar.visibility = View.GONE
+                        binding.llImg.visibility = View.VISIBLE
+                        return false
+                    }
+
+                    override fun onLoadFailed(
+                        e: GlideException?,
+                        model: Any?,
+                        target: Target<Drawable>,
+                        isFirstResource: Boolean
+                    ): Boolean {
+                        binding.progressBar.visibility = View.GONE
+                        binding.llImg.visibility = View.VISIBLE
+                        return false
+                    }
+                })
+                .into(imageView)
+
             binding.scoreImagesContainer.addView(imageView)
         }
     }
 
+    /**
+     * 切换收藏状态
+     */
     private fun toggleFavorite() {
         if (isFavorite) {
-            // 移除收藏
             favoritesManager.removeFavorite(scoreUrl)
             isFavorite = false
             isLove = false
             Toast.makeText(this, "已取消收藏", Toast.LENGTH_SHORT).show()
         } else {
-            // 添加收藏
             val score = Score(scoreTitle, scoreUrl, name)
             favoritesManager.addFavorite(score)
             isFavorite = true
@@ -286,51 +311,55 @@ class ScoreDetailActivity : AppCompatActivity() {
 
     private fun updateFavoriteButtonAppearance() {
         binding.favoriteButton.setBackgroundResource(
-            if (isFavorite) R.drawable.bg_round
-            else R.drawable.bg_grew
+            if (isFavorite) R.drawable.bg_round else R.drawable.bg_grew
         )
     }
 
+    /**
+     * 切换喜欢状态
+     */
     private fun toggleLove() {
+        val score = Score(scoreTitle, scoreUrl, name, isLove = !isLove)
+        favoritesManager.addFavorite(score)
+
         if (isLove) {
-            val score = Score(scoreTitle, scoreUrl, name, isLove = false)
-            favoritesManager.addFavorite(score)
             isLove = false
             Toast.makeText(this, "已不喜欢", Toast.LENGTH_SHORT).show()
         } else {
-            // 添加收藏
-            val score = Score(scoreTitle, scoreUrl, name, isLove = true)
-            favoritesManager.addFavorite(score)
             isLove = true
             isFavorite = true
             Toast.makeText(this, "已设置为喜欢", Toast.LENGTH_SHORT).show()
-
         }
+
         updateLoveButtonAppearance()
         updateFavoriteButtonAppearance()
     }
 
     private fun updateLoveButtonAppearance() {
         binding.loveButton.setBackgroundResource(
-            if (isLove) R.drawable.bg_round
-            else R.drawable.bg_grew
+            if (isLove) R.drawable.bg_round else R.drawable.bg_grew
         )
     }
 
-
-
+    /**
+     * 更新进度条
+     */
     private fun updateSeekBar() {
         lifecycleScope.launch {
             delay(500)
-            if (mediaPlayer?.isPlaying == true) {
-                binding.sbProgress.progress = mediaPlayer?.currentPosition ?: 0
-                binding.tvTime.text = formatTime(mediaPlayer?.currentPosition ?: 0)
-                updateSeekBar()
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    binding.sbProgress.progress = player.currentPosition
+                    binding.tvTime.text = formatTime(player.currentPosition)
+                    updateSeekBar()
+                }
             }
         }
-
     }
 
+    /**
+     * 格式化时间显示
+     */
     private fun formatTime(milliseconds: Int): String {
         val format = SimpleDateFormat("mm:ss", Locale.getDefault())
         return format.format(Date(milliseconds.toLong()))
@@ -339,5 +368,6 @@ class ScoreDetailActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mediaPlayer?.release()
+        mediaPlayer = null
     }
 } 

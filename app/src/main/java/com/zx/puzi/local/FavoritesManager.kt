@@ -18,7 +18,6 @@ class FavoritesManager private constructor(private val context: Context) {
         private const val PREF_NAME = "favorites"
         private const val KEY_FAVORITES = "favorites_list"
 
-
         @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instance: FavoritesManager? = null
@@ -37,18 +36,20 @@ class FavoritesManager private constructor(private val context: Context) {
      */
     fun getFavorites(): List<Score> {
         val favoritesList = mutableListOf<Score>()
-        val favoritesJson = sharedPreferences.getString(KEY_FAVORITES, "[]")
+        val favoritesJson = sharedPreferences.getString(KEY_FAVORITES, "[]") ?: "[]"
 
         try {
             val jsonArray = JSONArray(favoritesJson)
             for (i in 0 until jsonArray.length()) {
                 val jsonObject = jsonArray.getJSONObject(i)
-                val title = jsonObject.getString("title")
-                val url = jsonObject.getString("url")
-                val name = jsonObject.optString("name", "")
-                val time = jsonObject.optLong("time", 0L)
-                val isLove = jsonObject.optBoolean("love",false)
-                favoritesList.add(Score(title, url, name, time, isLove = isLove))
+                val score = Score(
+                    title = jsonObject.getString("title"),
+                    url = jsonObject.getString("url"),
+                    name = jsonObject.optString("name", ""),
+                    time = jsonObject.optLong("time", 0L),
+                    isLove = jsonObject.optBoolean("love", false)
+                )
+                favoritesList.add(score)
             }
         } catch (e: JSONException) {
             e.printStackTrace()
@@ -62,10 +63,13 @@ class FavoritesManager private constructor(private val context: Context) {
     fun addFavorite(score: Score): Boolean {
         val currentFavorites = getFavorites().toMutableList()
 
-        // 检查是否已存在
-        currentFavorites.removeAll(currentFavorites.filter { it.url == score.url })
+        // 移除已存在的相同URL的曲谱
+        currentFavorites.removeAll { it.url == score.url }
+
+        // 更新时间戳并添加
         score.time = System.currentTimeMillis()
         currentFavorites.add(score)
+
         return saveFavorites(currentFavorites)
     }
 
@@ -78,11 +82,11 @@ class FavoritesManager private constructor(private val context: Context) {
 
         currentFavorites.removeAll { it.url == url }
 
-        if (currentFavorites.size != initialSize) {
-            return saveFavorites(currentFavorites)
+        return if (currentFavorites.size != initialSize) {
+            saveFavorites(currentFavorites)
+        } else {
+            false
         }
-
-        return false
     }
 
     /**
@@ -121,32 +125,42 @@ class FavoritesManager private constructor(private val context: Context) {
             .commit()
     }
 
-
+    /**
+     * 备份收藏到本地文件
+     */
     fun saveToLocal() {
         try {
             val favoritesJson = sharedPreferences.getString(KEY_FAVORITES, "[]") ?: "[]"
             DownloadFileUtils.saveFileToDownload(context, "puzi", "puzi", favoritesJson)
             Toast.makeText(context, "备份成功", Toast.LENGTH_SHORT).show()
         } catch (e: Throwable) {
+            e.printStackTrace()
             Toast.makeText(context, "备份失败", Toast.LENGTH_SHORT).show()
         }
     }
 
+    /**
+     * 从本地文件恢复收藏
+     */
     fun loadFromLocal(content: String) {
         try {
             if (content.isEmpty()) return
+
             val jsonArray = JSONArray(content)
             for (i in 0 until jsonArray.length()) {
                 val jsonObject = jsonArray.getJSONObject(i)
-                val title = jsonObject.getString("title")
-                val url = jsonObject.getString("url")
-                val name = jsonObject.optString("name", "")
-                val time = jsonObject.optLong("time", 0L)
-                val isLove = jsonObject.optBoolean("love",false)
-                addFavorite(Score(title, url, name, time, isLove = isLove))
+                val score = Score(
+                    title = jsonObject.getString("title"),
+                    url = jsonObject.getString("url"),
+                    name = jsonObject.optString("name", ""),
+                    time = jsonObject.optLong("time", 0L),
+                    isLove = jsonObject.optBoolean("love", false)
+                )
+                addFavorite(score)
             }
             Toast.makeText(context, "同步成功", Toast.LENGTH_SHORT).show()
         } catch (e: Throwable) {
+            e.printStackTrace()
             Toast.makeText(context, "同步失败", Toast.LENGTH_SHORT).show()
         }
     }

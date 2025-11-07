@@ -19,13 +19,14 @@ import com.zx.puzi.ui.adapter.ScoreAdapter
 
 /**
  * 曲谱列表Fragment
+ * 显示热门曲谱列表和搜索功能
  */
 class ScoresFragment : Fragment() {
     private var _binding: FragmentScoresBinding? = null
     private val binding get() = _binding!!
-    
+
     private lateinit var adapter: ScoreAdapter
-    
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -37,59 +38,55 @@ class ScoresFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupRecyclerView()
-        setupSearchButton()
+        setupSearchControls()
         loadHotScores()
     }
-    
+
     private fun setupRecyclerView() {
         adapter = ScoreAdapter { score ->
             navigateToScoreDetail(score)
         }
-        
+
         binding.scoresRecyclerView.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = this@ScoresFragment.adapter
         }
     }
-    
-    private fun setupSearchButton() {
+
+    private fun setupSearchControls() {
         binding.searchButton.setOnClickListener {
-            val query = binding.searchEditText.text.toString().trim()
-            if (query.isNotEmpty()) {
-                val intent = Intent(requireContext(), SearchResultsActivity::class.java).apply {
-                    putExtra("query", query)
-                }
-                startActivity(intent)
-            } else {
-                Toast.makeText(context, "请输入搜索内容", Toast.LENGTH_SHORT).show()
-            }
+            performSearch()
         }
+
         binding.ivRefresh.setOnClickListener {
             loadHotScores()
         }
+
         binding.searchEditText.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH ||
                 (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
             ) {
-                val query = binding.searchEditText.text.toString().trim()
-                if (query.isNotEmpty()) {
-                    val intent = Intent(requireContext(), SearchResultsActivity::class.java).apply {
-                        putExtra("query", query)
-                    }
-                    startActivity(intent)
-                } else {
-                    Toast.makeText(context, "请输入搜索内容", Toast.LENGTH_SHORT).show()
-                }
-
-                true // 表示事件已处理
+                performSearch()
+                true
             } else {
                 false
             }
         }
     }
-    
+
+    private fun performSearch() {
+        val query = binding.searchEditText.text.toString().trim()
+        if (query.isNotEmpty()) {
+            val intent = Intent(requireContext(), SearchResultsActivity::class.java).apply {
+                putExtra("query", query)
+            }
+            startActivity(intent)
+        } else {
+            Toast.makeText(context, "请输入搜索内容", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun navigateToScoreDetail(score: Score) {
         val intent = Intent(requireContext(), ScoreDetailActivity::class.java).apply {
             putExtra("url", score.url)
@@ -101,8 +98,7 @@ class ScoresFragment : Fragment() {
 
     private fun loadHotScores() {
         binding.progressBar.visibility = View.VISIBLE
-        
-        // 使用ApiService获取热门曲谱
+
         ApiService.instance.getHotScores(
             onSuccess = { scores ->
                 activity?.runOnUiThread {

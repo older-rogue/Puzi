@@ -83,23 +83,24 @@ object DownloadFileUtils {
 
     /**
      * 读取 Download 目录下的文件内容
-     * @param context 上下文
      * @param fileName 要读取的文件名
      * @return 文件内容（字符串），如果失败则返回 null
      */
+    @Suppress("DEPRECATION")
     fun readFileFromDownload(fileName: String): String? {
-        val file = File(Environment.getExternalStorageDirectory(), "Download/$fileName.txt")
-        if (file.exists()) {
-            return file.readText()
+        return try {
+            val file = File(Environment.getExternalStorageDirectory(), "Download/$fileName.txt")
+            if (file.exists()) file.readText() else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
-        return null
     }
-
 
     /**
      * 列出 Download 目录中的所有文件
      * @param context 上下文
-     * @return List<String> 文件名列表
+     * @return 文件名列表
      */
     fun listDownloadFiles(context: Context): List<String> {
         val fileList = mutableListOf<String>()
@@ -109,7 +110,6 @@ object DownloadFileUtils {
 
         contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
-
             while (cursor.moveToNext()) {
                 val name = cursor.getString(nameColumn)
                 fileList.add(name)

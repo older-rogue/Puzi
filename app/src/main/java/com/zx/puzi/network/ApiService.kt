@@ -18,23 +18,30 @@ import kotlin.random.Random
  * 网络请求服务类，专门处理网络相关操作
  */
 class ApiService private constructor() {
+
     companion object {
+        private const val BASE_URL = "https://www.qupu123.com"
+        private const val LICENSE_CHECK_URL = "https://www.pgyer.com/4zY5oxqe"
+        private const val UPDATE_CHECK_URL = "https://api.pgyer.com/apiv2/app/check"
+        private const val API_KEY = "56eac30dc043da146b8b834b88ab1ff8"
+        private const val APP_KEY = "951ecb48ae4ab9b21932f8451c1ed2f0"
+        private const val TIMEOUT_SECONDS = 10L
+
         val instance: ApiService by lazy { ApiService() }
     }
-    
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
     /**
-     * 这个地址是我蒲公英一个空白app的地址
-     * 如果有特殊情况（侵权问题），这个app将会被删掉，来达到停用的目的
-     * 没办法，不想自己搭个服务器，也没有想到好方法
+     * 检查应用授权状态
+     * 通过检查蒲公英上的空白app是否存在来判断应用是否可用
      */
     fun checkLicense(onSuccess: (Boolean) -> Unit, onError: (String) -> Unit) {
         val request = Request.Builder()
-            .url("https://www.pgyer.com/4zY5oxqe")
+            .url(LICENSE_CHECK_URL)
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -43,108 +50,130 @@ class ApiService private constructor() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                onSuccess(response.code != 404)
+                response.use {
+                    onSuccess(it.code != 404)
+                }
             }
         })
     }
 
+    /**
+     * 检查应用更新
+     */
     fun checkUpdate(callback: (UpdateInfo) -> Unit) {
-// 构建表单请求体
         val formBody = FormBody.Builder()
-            .add("_api_key", "56eac30dc043da146b8b834b88ab1ff8")
-            .add("appKey", "951ecb48ae4ab9b21932f8451c1ed2f0")
-            .build();
+            .add("_api_key", API_KEY)
+            .add("appKey", APP_KEY)
+            .build()
 
         val request = Request.Builder()
-            .url("https://api.pgyer.com/apiv2/app/check")
+            .url(UPDATE_CHECK_URL)
             .post(formBody)
             .build()
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                // 静默失败，不影响主流程
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (response.code == 200 && response.body != null) {
-                    val data = response.body?.string()?:""
-                    if(data.isNotEmpty()){
-                        val jsonObject = JSONObject(data)
-                        val finalData = jsonObject.getJSONObject("data")
-                        val buildVersionNo = finalData.optString("buildVersionNo", "")
-                        val buildVersion = finalData.optString("buildVersion", "")
-                        val appURl = finalData.optString("appURl", "")
-                        val buildUpdateDescription = finalData.optString("buildUpdateDescription", "")
-                        callback(UpdateInfo(buildVersionNo,buildVersion,appURl,buildUpdateDescription))
+                response.use {
+                    if (it.code == 200) {
+                        val data = it.body?.string() ?: return
+                        if (data.isNotEmpty()) {
+                            try {
+                                val jsonObject = JSONObject(data)
+                                val finalData = jsonObject.getJSONObject("data")
+                                val updateInfo = UpdateInfo(
+                                    buildVersionNo = finalData.optString("buildVersionNo", "0"),
+                                    buildVersion = finalData.optString("buildVersion", ""),
+                                    appUrl = finalData.optString("appURl", ""),
+                                    buildUpdateDescription = finalData.optString("buildUpdateDescription", "无")
+                                )
+                                callback(updateInfo)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
                     }
                 }
             }
         })
     }
-    
+
     /**
      * 获取热门曲谱
      */
     fun getHotScores(onSuccess: (List<Score>) -> Unit, onError: (String) -> Unit) {
         val request = Request.Builder()
-            .url("https://www.qupu123.com/tongsu/${Random.nextInt(1, 728)}.html")
-//            .url("https://www.pgyer.com/4zY5oxqe")
+            .url("$BASE_URL/tongsu/${Random.nextInt(1, 728)}.html")
             .build()
-            
+
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 onError(e.message ?: "网络请求失败")
             }
-            
+
             override fun onResponse(call: Call, response: Response) {
-                val html = response.body?.string() ?: ""
-                val scores = HtmlParserUtil.parseHotScores(html)
-                onSuccess(scores)
+                response.use {
+                    val html = it.body?.string() ?: ""
+                    val scores = HtmlParserUtil.parseHotScores(html)
+                    onSuccess(scores)
+                }
             }
         })
     }
-    
+
     /**
      * 搜索曲谱
      */
     fun searchScores(query: String, onSuccess: (List<Score>) -> Unit, onError: (String) -> Unit) {
         try {
-            val url = "https://www.qupu123.com/Search?keys=${query}&cid="
+            val url = "$BASE_URL/Search?keys=$query&cid="
             val request = Request.Builder()
                 .url(url)
                 .build()
-                
+
             client.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     onError(e.message ?: "搜索请求失败")
                 }
-                
+
                 override fun onResponse(call: Call, response: Response) {
-                    val html = response.body?.string() ?: ""
-                    val results = parseSearchResults(html)
-                    onSuccess(results)
+                    response.use {
+                        val html = it.body?.string() ?: ""
+                        val results = parseSearchResults(html)
+                        onSuccess(results)
+                    }
                 }
             })
         } catch (e: Exception) {
             onError(e.message ?: "搜索请求异常")
         }
     }
-    
+
     /**
      * 解析搜索结果
      */
     private fun parseSearchResults(html: String): List<Score> {
         val results = mutableListOf<Score>()
-        
+
         try {
             val regex = """<td class="f1">.*?<a href="([^"]+)"[^>]*>(.*?)</a>.*?</td>\s*<td class="f3">(.*?)</td>""".toRegex()
             regex.findAll(html).forEach { matchResult ->
                 val (url, title, artist) = matchResult.destructured
-                results.add(Score(title, "https://www.qupu123.com$url", artist.ifBlank { "未知" }))
+                results.add(
+                    Score(
+                        title = title,
+                        url = "$BASE_URL$url",
+                        name = artist.ifBlank { "未知" }
+                    )
+                )
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        
+
         return results
     }
 } 

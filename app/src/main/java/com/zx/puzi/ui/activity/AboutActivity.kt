@@ -9,13 +9,15 @@ import com.zx.puzi.databinding.ActivityAboutBinding
 import com.zx.puzi.local.LocalData
 import com.zx.puzi.utils.StatusBarUtil
 
+/**
+ * 关于页面Activity
+ * 首次启动时显示应用介绍
+ */
 class AboutActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAboutBinding
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 设置状态栏为白色
         binding = DataBindingUtil.setContentView(this, R.layout.activity_about)
         StatusBarUtil.setWhiteStatusBar(this)
         initView()
@@ -27,9 +29,9 @@ class AboutActivity : AppCompatActivity() {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }
+
         binding.tvClose.setOnClickListener {
             finish()
         }
     }
-
 } 

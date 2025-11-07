@@ -20,51 +20,51 @@ import com.zx.puzi.model.Score
 class ScoreAdapter(
     private val isFavoritesFragment: Boolean = false,
     private val onItemClick: (Score) -> Unit
-) :
-    ListAdapter<Score, ScoreAdapter.ViewHolder>(ScoreDiffCallback()) {
+) : ListAdapter<Score, ScoreAdapter.ViewHolder>(ScoreDiffCallback()) {
 
-    class ViewHolder(itemView: View) :
-        RecyclerView.ViewHolder(itemView) {
-        
+    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val titleTextView: TextView = itemView.findViewById(R.id.score_title)
         private val authorTextView: TextView = itemView.findViewById(R.id.score_author)
         private val favoriteButton: ImageView = itemView.findViewById(R.id.favorite_button)
 
         fun bind(score: Score, isFavoritesFragment: Boolean, callback: () -> Unit) {
             titleTextView.text = score.title
-            
-            if (score.name.isNotEmpty()) {
-                authorTextView.visibility = View.VISIBLE
-                authorTextView.text = score.name
-            } else {
-                authorTextView.visibility = View.GONE
+
+            // 设置作者信息
+            authorTextView.apply {
+                if (score.name.isNotEmpty()) {
+                    visibility = View.VISIBLE
+                    text = score.name
+                } else {
+                    visibility = View.GONE
+                }
             }
 
+            // 设置收藏/喜欢图标
+            val favoritesManager = FavoritesManager.getInstance(itemView.context)
             favoriteButton.isVisible = if (isFavoritesFragment) {
                 favoriteButton.setImageResource(R.drawable.love)
-                FavoritesManager.getInstance(itemView.context)
-                    .isLove(score.url)
+                favoritesManager.isLove(score.url)
             } else {
                 favoriteButton.setImageResource(R.drawable.favorite_white)
-                FavoritesManager.getInstance(itemView.context)
-                    .isFavorite(score.url)
+                favoritesManager.isFavorite(score.url)
             }
 
+            // 设置标题颜色（已点击显示灰色）
+            @Suppress("DEPRECATION")
             titleTextView.setTextColor(
-                if (score.isClick) {
-                    itemView.context.resources.getColor(R.color.grey, null)
-                } else {
-                    itemView.context.resources.getColor(R.color.black, null)
-                }
+                itemView.context.resources.getColor(
+                    if (score.isClick) R.color.grey else R.color.black,
+                    null
+                )
             )
 
             itemView.setOnClickListener {
                 callback()
             }
-
         }
     }
-    
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_score, parent, false)
@@ -73,10 +73,11 @@ class ScoreAdapter(
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(getItem(position), isFavoritesFragment) {
+        val score = getItem(position)
+        holder.bind(score, isFavoritesFragment) {
             currentList[position].isClick = true
             notifyDataSetChanged()
-            onItemClick(currentList[position])
+            onItemClick(score)
         }
     }
 }
@@ -88,7 +89,7 @@ private class ScoreDiffCallback : DiffUtil.ItemCallback<Score>() {
     override fun areItemsTheSame(oldItem: Score, newItem: Score): Boolean {
         return oldItem.url == newItem.url
     }
-    
+
     override fun areContentsTheSame(oldItem: Score, newItem: Score): Boolean {
         return oldItem == newItem
     }
