@@ -1,5 +1,6 @@
 package com.zx.puzi.ui.activity
 
+import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -56,6 +57,7 @@ class ScoreDetailActivity : AppCompatActivity() {
     private var isFavorite = false
     private var isLove = false
     private var mediaPlayer: MediaPlayer? = null
+    private val imageUrls = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -163,7 +165,7 @@ class ScoreDetailActivity : AppCompatActivity() {
             override fun onResponse(call: Call, response: Response) {
                 response.use {
                     val html = it.body?.string() ?: ""
-                    val imageUrls = extractImageUrlsFromHtml(html)
+                    val extractedUrls = extractImageUrlsFromHtml(html)
                     val musicUrl = extractMusicUrlsFromHtml(html)
 
                     runOnUiThread {
@@ -171,7 +173,9 @@ class ScoreDetailActivity : AppCompatActivity() {
                             initMediaPlayer(musicUrl)
                             binding.llMusic.isVisible = true
                         }
-                        displayScoreImages(imageUrls)
+                        imageUrls.clear()
+                        imageUrls.addAll(extractedUrls)
+                        displayScoreImages(extractedUrls)
                     }
                 }
             }
@@ -247,7 +251,7 @@ class ScoreDetailActivity : AppCompatActivity() {
     private fun displayScoreImages(imageUrls: List<String>) {
         binding.scoreImagesContainer.removeAllViews()
 
-        imageUrls.forEach { url ->
+        imageUrls.forEachIndexed { index, url ->
             val imageView = ImageView(this).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -255,6 +259,10 @@ class ScoreDetailActivity : AppCompatActivity() {
                 )
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_CENTER
+            }
+
+            imageView.setOnClickListener {
+                openImageViewer(index)
             }
 
             Glide.with(this)
@@ -288,6 +296,17 @@ class ScoreDetailActivity : AppCompatActivity() {
 
             binding.scoreImagesContainer.addView(imageView)
         }
+    }
+
+    /**
+     * 打开图片查看器
+     */
+    private fun openImageViewer(position: Int) {
+        val intent = Intent(this, ImageViewerActivity::class.java).apply {
+            putStringArrayListExtra("imageUrls", ArrayList(imageUrls))
+            putExtra("position", position)
+        }
+        startActivity(intent)
     }
 
     /**

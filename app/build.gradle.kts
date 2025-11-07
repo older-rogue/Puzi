@@ -91,4 +91,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation("com.github.bumptech.glide:glide:4.16.0")
     kapt("com.github.bumptech.glide:compiler:4.16.0") // 使用 Glide 生成 API 代码
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
 }

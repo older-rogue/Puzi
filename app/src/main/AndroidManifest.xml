@@ -18,6 +18,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.activity.ImageViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ImageViewer" />
+
+        <activity
             android:name=".ui.activity.AboutActivity"
             android:exported="false" />
 
