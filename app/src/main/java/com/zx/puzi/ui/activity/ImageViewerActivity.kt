@@ -1,15 +1,25 @@
 package com.zx.puzi.ui.activity
 
+import android.content.ContentValues
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.databinding.DataBindingUtil
+import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
+import com.bumptech.glide.Glide
 import com.zx.puzi.R
 import com.zx.puzi.databinding.ActivityImageViewerBinding
 import com.zx.puzi.ui.adapter.ImageViewerAdapter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
 
 class ImageViewerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityImageViewerBinding
@@ -28,6 +38,7 @@ class ImageViewerActivity : AppCompatActivity() {
 
         setupViewPager()
         updatePageIndicator(currentPosition)
+        setupDownloadButton()
     }
 
     private fun setupViewPager() {
@@ -41,9 +52,69 @@ class ImageViewerActivity : AppCompatActivity() {
         binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
+                currentPosition = position
                 updatePageIndicator(position)
             }
         })
+    }
+
+    private fun setupDownloadButton() {
+        binding.downloadButton.setOnClickListener {
+            downloadCurrentImage()
+        }
+    }
+
+    private fun downloadCurrentImage() {
+        if (imageUrls.isEmpty()) return
+
+        val imageUrl = imageUrls[currentPosition]
+        
+        lifecycleScope.launch {
+            try {
+                binding.downloadButton.isEnabled = false
+                Toast.makeText(this@ImageViewerActivity, "正在下载...", Toast.LENGTH_SHORT).show()
+
+                val bitmap = withContext(Dispatchers.IO) {
+                    Glide.with(this@ImageViewerActivity)
+                        .asBitmap()
+                        .load(imageUrl)
+                        .submit()
+                        .get()
+                }
+
+                saveImageToGallery(bitmap)
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this@ImageViewerActivity, "下载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                binding.downloadButton.isEnabled = true
+            }
+        }
+    }
+
+    private fun saveImageToGallery(bitmap: Bitmap) {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "IMG_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Puzi")
+        }
+
+        val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+        uri?.let {
+            try {
+                contentResolver.openOutputStream(it)?.use { outputStream ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)
+                }
+                Toast.makeText(this, "图片已保存到相册", Toast.LENGTH_SHORT).show()
+            } catch (e: IOException) {
+                e.printStackTrace()
+                Toast.makeText(this, "保存失败", Toast.LENGTH_SHORT).show()
+            }
+        } ?: run {
+            Toast.makeText(this, "保存失败", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun updatePageIndicator(position: Int) {
