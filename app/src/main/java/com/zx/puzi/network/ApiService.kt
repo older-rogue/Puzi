@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
@@ -115,8 +116,12 @@ class ApiService private constructor() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    val html = it.body?.string() ?: ""
+                response.use { resp ->
+                    if (!resp.isSuccessful) {
+                        onError("请求失败: ${resp.code}")
+                        return
+                    }
+                    val html = resp.body?.string().orEmpty()
                     val scores = HtmlParserUtil.parseHotScores(html)
                     onSuccess(scores)
                 }
@@ -129,7 +134,9 @@ class ApiService private constructor() {
      */
     fun searchScores(query: String, onSuccess: (List<Score>) -> Unit, onError: (String) -> Unit) {
         try {
-            val url = "$BASE_URL/Search?keys=$query&cid="
+            // 对查询参数进行 URL 编码，避免中文或特殊字符导致请求失败
+            val encodedQuery = URLEncoder.encode(query, "UTF-8")
+            val url = "$BASE_URL/Search?keys=$encodedQuery&cid="
             val request = Request.Builder()
                 .url(url)
                 .build()
@@ -140,8 +147,12 @@ class ApiService private constructor() {
                 }
 
                 override fun onResponse(call: Call, response: Response) {
-                    response.use {
-                        val html = it.body?.string() ?: ""
+                    response.use { resp ->
+                        if (!resp.isSuccessful) {
+                            onError("搜索失败: ${resp.code}")
+                            return
+                        }
+                        val html = resp.body?.string().orEmpty()
                         val results = parseSearchResults(html)
                         onSuccess(results)
                     }

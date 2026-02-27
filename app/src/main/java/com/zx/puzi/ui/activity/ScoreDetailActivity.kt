@@ -175,8 +175,24 @@ class ScoreDetailActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    val html = it.body?.string() ?: ""
+                response.use { resp ->
+                    // 仅在 HTTP 成功时继续处理
+                    if (!resp.isSuccessful) {
+                        if (isFinishing || isDestroyed) {
+                            return
+                        }
+                        runOnUiThread {
+                            binding.progressBar.visibility = View.GONE
+                            Toast.makeText(
+                                this@ScoreDetailActivity,
+                                "加载曲谱失败: ${resp.code}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        return
+                    }
+
+                    val html = resp.body?.string().orEmpty()
                     // 网络成功后写入缓存
                     if (html.isNotEmpty()) {
                         saveHtmlToCache(scoreUrl, html)
@@ -234,14 +250,23 @@ class ScoreDetailActivity : AppCompatActivity() {
     }
 
     private fun initMediaPlayer(musicUrl: String) {
+        // 避免重复创建导致资源泄漏
+        mediaPlayer?.release()
+        mediaPlayer = null
+
         mediaPlayer = MediaPlayer().apply {
             try {
                 setDataSource(musicUrl)
-                prepareAsync()
                 setOnPreparedListener {
                     binding.sbProgress.max = duration
                     binding.tvTotalTime.text = formatTime(duration)
                 }
+                setOnCompletionListener {
+                    binding.ivAction.setImageResource(R.drawable.start)
+                    binding.sbProgress.progress = 0
+                    binding.tvTime.text = formatTime(0)
+                }
+                prepareAsync()
             } catch (e: IOException) {
                 e.printStackTrace()
                 runOnUiThread {
@@ -425,13 +450,14 @@ class ScoreDetailActivity : AppCompatActivity() {
      */
     private fun updateSeekBar() {
         lifecycleScope.launch {
-            delay(500)
-            mediaPlayer?.let { player ->
-                if (player.isPlaying) {
-                    binding.sbProgress.progress = player.currentPosition
-                    binding.tvTime.text = formatTime(player.currentPosition)
-                    updateSeekBar()
+            while (true) {
+                val player = mediaPlayer ?: break
+                if (!player.isPlaying) {
+                    break
                 }
+                binding.sbProgress.progress = player.currentPosition
+                binding.tvTime.text = formatTime(player.currentPosition)
+                delay(500)
             }
         }
     }
@@ -440,8 +466,10 @@ class ScoreDetailActivity : AppCompatActivity() {
      * 格式化时间显示
      */
     private fun formatTime(milliseconds: Int): String {
-        val format = SimpleDateFormat("mm:ss", Locale.getDefault())
-        return format.format(Date(milliseconds.toLong()))
+        val totalSeconds = milliseconds / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 
     override fun onDestroy() {
