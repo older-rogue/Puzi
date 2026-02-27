@@ -18,7 +18,7 @@ android {
         minSdk = 30
         targetSdk = 34
         versionCode = SimpleDateFormat("yyMMddHH", Locale.CHINA).format(Date().time).toInt()
-        versionName = "1.0.4"
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
