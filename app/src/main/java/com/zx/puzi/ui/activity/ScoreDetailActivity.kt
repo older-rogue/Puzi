@@ -32,6 +32,7 @@ import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -145,6 +146,14 @@ class ScoreDetailActivity : AppCompatActivity() {
             return
         }
 
+        // 先尝试从本地缓存读取 HTML，加快页面展示速度
+        val cachedHtml = loadHtmlFromCache(scoreUrl)
+        if (!cachedHtml.isNullOrEmpty()) {
+            processHtml(cachedHtml)
+            // 如果已有缓存，根据需求这里就不再发起网络请求
+            return
+        }
+
         binding.progressBar.visibility = View.VISIBLE
         val request = Request.Builder()
             .url(scoreUrl)
@@ -168,24 +177,60 @@ class ScoreDetailActivity : AppCompatActivity() {
             override fun onResponse(call: Call, response: Response) {
                 response.use {
                     val html = it.body?.string() ?: ""
-                    val extractedUrls = extractImageUrlsFromHtml(html)
-                    val musicUrl = extractMusicUrlsFromHtml(html)
-
-                    runOnUiThread {
-                        if (isFinishing || isDestroyed) {
-                            return@runOnUiThread
-                        }
-                        if (musicUrl.isNotEmpty()) {
-                            initMediaPlayer(musicUrl)
-                            binding.llMusic.isVisible = true
-                        }
-                        imageUrls.clear()
-                        imageUrls.addAll(extractedUrls)
-                        displayScoreImages(extractedUrls)
+                    // 网络成功后写入缓存
+                    if (html.isNotEmpty()) {
+                        saveHtmlToCache(scoreUrl, html)
                     }
+                    processHtml(html)
                 }
             }
         })
+    }
+
+    /**
+     * 统一处理 HTML 内容：提取图片、音频并更新 UI
+     */
+    private fun processHtml(html: String) {
+        val extractedUrls = extractImageUrlsFromHtml(html)
+        val musicUrl = extractMusicUrlsFromHtml(html)
+
+        runOnUiThread {
+            if (isFinishing || isDestroyed) {
+                return@runOnUiThread
+            }
+            if (musicUrl.isNotEmpty()) {
+                initMediaPlayer(musicUrl)
+                binding.llMusic.isVisible = true
+            }
+            imageUrls.clear()
+            imageUrls.addAll(extractedUrls)
+            displayScoreImages(extractedUrls)
+        }
+    }
+
+    /**
+     * 从本地缓存读取 HTML
+     */
+    private fun loadHtmlFromCache(url: String): String? {
+        return try {
+            val file = File(cacheDir, "score_${url.hashCode()}.html")
+            if (file.exists()) file.readText() else null
+        } catch (e: IOException) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * 将 HTML 写入本地缓存
+     */
+    private fun saveHtmlToCache(url: String, html: String) {
+        try {
+            val file = File(cacheDir, "score_${url.hashCode()}.html")
+            file.writeText(html)
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
     }
 
     private fun initMediaPlayer(musicUrl: String) {
