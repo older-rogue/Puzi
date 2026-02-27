@@ -152,6 +152,9 @@ class ScoreDetailActivity : AppCompatActivity() {
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                if (isFinishing || isDestroyed) {
+                    return
+                }
                 runOnUiThread {
                     binding.progressBar.visibility = View.GONE
                     Toast.makeText(
@@ -169,6 +172,9 @@ class ScoreDetailActivity : AppCompatActivity() {
                     val musicUrl = extractMusicUrlsFromHtml(html)
 
                     runOnUiThread {
+                        if (isFinishing || isDestroyed) {
+                            return@runOnUiThread
+                        }
                         if (musicUrl.isNotEmpty()) {
                             initMediaPlayer(musicUrl)
                             binding.llMusic.isVisible = true
@@ -204,30 +210,39 @@ class ScoreDetailActivity : AppCompatActivity() {
      * 从HTML中提取图片URL
      */
     private fun extractImageUrlsFromHtml(html: String): List<String> {
-        val imageUrls = mutableListOf<String>()
-
         try {
-            // 提取普通图片链接
-            val regex = """href=['"]((/Public/Uploads/|/data2/uploads/)[^'"]+)['"]""".toRegex()
-            regex.findAll(html).forEach {
-                imageUrls.add("https://www.qupu123.com${it.groupValues[1]}")
+            val imagePairs = mutableListOf<Pair<Int, String>>()
+
+            // 提取普通图片链接，记录在HTML中的位置
+            val normalRegex = """href=['"]((/Public/Uploads/|/data2/uploads/)[^'"]+)['"]""".toRegex()
+            normalRegex.findAll(html).forEach { match ->
+                val url = "https://www.qupu123.com${match.groupValues[1]}"
+                imagePairs.add(match.range.first to url)
             }
 
-            // 提取加密图片链接
+            // 提取加密图片链接：按 showopern 在 HTML 中出现的位置排序
             val showopernRegex = """showopern\(([^,]+),\s*"([^"]+)"\)""".toRegex()
-            showopernRegex.findAll(html).forEach {
-                val key = it.groupValues[1]
-                val value = it.groupValues[2]
+            showopernRegex.findAll(html).forEach { showMatch ->
+                val key = showMatch.groupValues[1]
+                val value = showMatch.groupValues[2]
                 val varRegex = """var\s+$key\s*=\s*"([^"]+)"""".toRegex()
-                varRegex.findAll(html).forEach { match ->
-                    val image = DecodeUtils.showdown(match.groupValues[1], value)
-                    imageUrls.add(1, "https://www.qupu123.com$image")
+                varRegex.findAll(html).forEach { varMatch ->
+                    val image = DecodeUtils.showdown(varMatch.groupValues[1], value)
+                    val url = "https://www.qupu123.com$image"
+                    // 这里使用 showopern(...) 在 HTML 中的位置作为排序依据，
+                    // 更贴近页面实际展示顺序，而不是变量定义的位置
+                    imagePairs.add(showMatch.range.first to url)
                 }
             }
+
+            return imagePairs
+                .sortedBy { it.first }
+                .map { it.second }
+                .distinct()
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return imageUrls
+        return emptyList()
     }
 
     /**

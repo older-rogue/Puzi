@@ -24,7 +24,7 @@ class ImageViewerAdapter(
     }
 
     override fun onBindViewHolder(holder: ImageViewHolder, position: Int) {
-        Glide.with(holder.itemView.context)
+        Glide.with(holder.photoView)
             .load(imageUrls[position])
             .into(holder.photoView)
 
